@@ -1,0 +1,9 @@
+{
+    "validation_metrics": {
+        "rmse_minutes": 4.444698067808437,
+        "mae_minutes": 2.6279257785487102,
+        "r2": 0.8242722765200162
+    },
+    "validation_rows": 143572,
+    "target_unit": "minutes"
+}

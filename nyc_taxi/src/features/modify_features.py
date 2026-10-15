@@ -22,8 +22,9 @@ modify_logger.set_log_level(level=logging.INFO)
 
 ## Functions applied on target column
 def convert_target_to_minutes(dataframe: pd.DataFrame, target_column: str) -> pd.DataFrame:
-    # convert the target into minutes
-    dataframe.loc[:,target_column] = dataframe[target_column] / 60
+    dataframe = dataframe.copy()
+    dataframe[target_column] = dataframe[target_column].astype(float) / 60
+
     modify_logger.save_logs(msg='Target column converted from seconds into minutes')
     return dataframe
 
@@ -46,6 +47,7 @@ def plot_target(dataframe: pd.DataFrame, target_column: str, save_path: str):
     plt.title(f'Distribution of {target_column}')
     # save the plot at the destination path
     plt.savefig(save_path)
+    plt.close()
     modify_logger.save_logs(msg='Distribution plot saved at destination')
     
     
@@ -123,17 +125,34 @@ def input_modifications(dataframe: pd.DataFrame) -> pd.DataFrame:
     modify_logger.save_logs('Modifications with input features complete')
     return df_with_datetime_features
 
-   
-def target_modifications(dataframe: pd.DataFrame, target_column: str=TARGET_COLUMN) -> pd.DataFrame:
-    # convert the target column from seconds to minutes
-    minutes_dataframe = convert_target_to_minutes(dataframe,target_column)
-    # remove target values greater than 200
-    target_outliers_removed_df = drop_above_two_hundred_minutes(minutes_dataframe,target_column)
-    # plot the target column
-    plot_target(dataframe=target_outliers_removed_df,target_column=target_column,
-                save_path=root_path / PLOT_PATH)
+def target_modifications(
+    dataframe: pd.DataFrame,
+    target_column: str = TARGET_COLUMN
+) -> pd.DataFrame:
+
+    # Convert target from seconds to minutes
+    minutes_dataframe = convert_target_to_minutes(dataframe, target_column)
+
+    # Remove target values greater than 200 minutes
+    target_outliers_removed_df = drop_above_two_hundred_minutes(
+        minutes_dataframe, target_column
+    )
+
+    # Create the plot directory and save the target distribution plot
+    save_path = Path(__file__).resolve().parents[2] / PLOT_PATH
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    plot_target(
+        dataframe=target_outliers_removed_df,
+        target_column=target_column,
+        save_path=str(save_path)
+    )
+
     modify_logger.save_logs('Modifications with the target feature complete')
+
     return target_outliers_removed_df
+
+
 
 # read the dataframe from location
 def read_data(data_path):

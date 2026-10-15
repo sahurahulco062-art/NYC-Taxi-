@@ -1,0 +1,96 @@
+
+stages:
+  extract_dataset:
+    cmd: python -m src.data.extract_dataset
+    deps:
+      - src/data/extract_dataset.py
+      - data/raw/zipped
+    outs:
+      - data/raw/extracted
+
+  make_dataset:
+    cmd: python -m src.data.make_dataset train.csv
+    deps:
+      - src/data/make_dataset.py
+      - data/raw/extracted/train.csv
+    params:
+      - make_dataset.test_size
+      - make_dataset.random_state
+    outs:
+      - data/interim
+
+  modify_features:
+    cmd: python -m src.features.modify_features data/interim/train.csv data/interim/val.csv data/raw/extracted/test.csv
+    deps:
+      - src/features/modify_features.py
+      - data/interim/train.csv
+      - data/interim/val.csv
+      - data/raw/extracted/test.csv
+    outs:
+      - data/processed/transformations
+
+  build_features:
+    cmd: python -m src.features.build_features data/processed/transformations/train.csv data/processed/transformations/val.csv data/processed/transformations/test.csv
+    deps:
+      - src/features/build_features.py
+      - src/features/distances.py
+      - data/processed/transformations/train.csv
+      - data/processed/transformations/val.csv
+      - data/processed/transformations/test.csv
+    outs:
+      - data/processed/build-features
+
+  data_preprocessing:
+    cmd: python -m src.features.data_preprocessing train.csv val.csv test.csv
+    deps:
+      - src/features/data_preprocessing.py
+      - src/features/outliers_removal.py
+      - data/processed/build-features/train.csv
+      - data/processed/build-features/val.csv
+      - data/processed/build-features/test.csv
+    params:
+      - data_preprocessing.percentiles
+    outs:
+      - data/processed/final
+      - models/transformers
+
+  train_model:
+    cmd: python -m src.models.train_model
+    deps:
+      - src/models/train_model.py
+      - src/features/data_preprocessing.py
+      - src/features/outliers_removal.py
+      - src/features/distances.py
+      - data/interim/train.csv
+      - data/processed/final/train.csv
+      - models/transformers/output_transformer.joblib
+    params:
+      - train_model.n_trials
+      - train_model.cv_folds
+      - train_model.random_state
+      - data_preprocessing.percentiles
+    outs:
+      - models/models/xgbreg.joblib
+    metrics:
+      - reports/metrics/optuna_results.json:
+          cache: false
+
+  predict_model:
+    cmd: python -m src.models.predict_model train.csv val.csv
+    deps:
+      - src/models/predict_model.py
+      - src/features/data_preprocessing.py
+      - data/processed/final/val.csv
+      - models/models/xgbreg.joblib
+      - models/transformers/output_transformer.joblib
+    metrics:
+      - reports/metrics/validation_metrics.json:
+          cache: false
+
+  plot_results:
+    cmd: python -m src.visualization.plot_results
+    deps:
+      - src/visualization/plot_results.py
+      - reports/metrics/validation_metrics.json
+    outs:
+      - plots/model_results

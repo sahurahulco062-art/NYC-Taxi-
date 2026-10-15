@@ -120,12 +120,13 @@ def main():
                              object=preprocessor)
             # transform the data
             X_trans = transform_data(transformer=preprocessor,
-                                     data=X)
+                                     data=df_without_outliers)
             # fit the target transformer
-            output_transformer = transform_output(y)
+            y_filtered = y.loc[df_without_outliers.index]
+            output_transformer = transform_output(y_filtered)
             # transform the target
             y_trans = transform_data(transformer=output_transformer,
-                                     data=y.values.reshape(-1,1))
+                                     data=y_filtered.values.reshape(-1,1))
             # save the transformed output to the df
             X_trans['trip_duration'] = y_trans
             # save the output transformer
@@ -149,12 +150,13 @@ def main():
             preprocessor = joblib.load(save_transformers_path / 'preprocessor.joblib')
             # transform the data
             X_trans = transform_data(transformer=preprocessor,
-                                    data=X)
+                                    data=df_without_outliers)
+            y_filtered = y.loc[df_without_outliers.index]
             # load the output transformer
             output_transformer = joblib.load(save_transformers_path / 'output_transformer.joblib') 
             # transform the target
             y_trans = transform_data(transformer=output_transformer,
-                                    data=y.values.reshape(-1,1))
+                                    data=y_filtered.values.reshape(-1,1))
             # save the transformed output to the df
             X_trans['trip_duration'] = y_trans
             
@@ -172,7 +174,7 @@ def main():
             preprocessor = joblib.load(save_transformers_path / 'preprocessor.joblib')
             # transform the data
             X_trans = transform_data(transformer=preprocessor,
-                                    data=df)
+                                    data=df_without_outliers)
             # save the transformed data
             save_dataframe(dataframe=X_trans,
                         save_path=save_data_path / filename)
