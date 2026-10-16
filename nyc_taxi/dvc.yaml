@@ -20,7 +20,11 @@ stages:
       - data/interim
 
   modify_features:
-    cmd: python -m src.features.modify_features data/interim/train.csv data/interim/val.csv data/raw/extracted/test.csv
+    cmd: >-
+      python -m src.features.modify_features
+      data/interim/train.csv
+      data/interim/val.csv
+      data/raw/extracted/test.csv
     deps:
       - src/features/modify_features.py
       - data/interim/train.csv
@@ -30,7 +34,11 @@ stages:
       - data/processed/transformations
 
   build_features:
-    cmd: python -m src.features.build_features data/processed/transformations/train.csv data/processed/transformations/val.csv data/processed/transformations/test.csv
+    cmd: >-
+      python -m src.features.build_features
+      data/processed/transformations/train.csv
+      data/processed/transformations/val.csv
+      data/processed/transformations/test.csv
     deps:
       - src/features/build_features.py
       - src/features/distances.py
@@ -40,6 +48,8 @@ stages:
     outs:
       - data/processed/build-features
 
+  # Retained for the existing baseline workflow. The stacking model uses
+  # build-features data and fits learned preprocessing inside CV folds.
   data_preprocessing:
     cmd: python -m src.features.data_preprocessing train.csv val.csv test.csv
     deps:
@@ -57,40 +67,37 @@ stages:
   train_model:
     cmd: python -m src.models.train_model
     deps:
+      - src/models/model_components.py
       - src/models/train_model.py
       - src/features/data_preprocessing.py
       - src/features/outliers_removal.py
-      - src/features/distances.py
-      - data/interim/train.csv
-      - data/processed/final/train.csv
-      - models/transformers/output_transformer.joblib
-    params:
-      - train_model.n_trials
-      - train_model.cv_folds
-      - train_model.random_state
-      - data_preprocessing.percentiles
+      - src/logger.py
+      - data/processed/build-features/train.csv
+      - params.yaml
     outs:
-      - models/models/xgbreg.joblib
+      - models/models/stacking_regressor.joblib
+      - reports/metrics/optuna
     metrics:
-      - reports/metrics/optuna_results.json:
+      - reports/metrics/stacking_results.json:
           cache: false
 
   predict_model:
-    cmd: python -m src.models.predict_model train.csv val.csv
+    cmd: python -m src.models.predict_model
     deps:
       - src/models/predict_model.py
-      - src/features/data_preprocessing.py
-      - data/processed/final/val.csv
-      - models/models/xgbreg.joblib
-      - models/transformers/output_transformer.joblib
+      - src/logger.py
+      - data/processed/build-features/val.csv
+      - models/models/stacking_regressor.joblib
     metrics:
-      - reports/metrics/validation_metrics.json:
+      - reports/metrics/stacking_validation_metrics.json:
           cache: false
 
   plot_results:
     cmd: python -m src.visualization.plot_results
     deps:
       - src/visualization/plot_results.py
-      - reports/metrics/validation_metrics.json
+      - src/logger.py
+      - data/processed/build-features/val.csv
+      - models/models/stacking_regressor.joblib
     outs:
-      - plots/model_results
+      - plots/model_results/results.png

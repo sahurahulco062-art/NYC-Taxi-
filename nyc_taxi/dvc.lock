@@ -27,8 +27,8 @@ stages:
       size: 200589097
     - path: src/data/make_dataset.py
       hash: md5
-      md5: 63f7cb7eb76659d9face16c29dc0e15b
-      size: 4052
+      md5: 7fcf368c508308eff866f294d356d051
+      size: 4066
     params:
       params.yaml:
         make_dataset.random_state: 30
@@ -114,8 +114,8 @@ stages:
       size: 23795086
     - path: src/features/data_preprocessing.py
       hash: md5
-      md5: f37bedbb517c442e2979781f91312a8d
-      size: 7736
+      md5: 1738b906660c105082827da9d91c9a71
+      size: 9487
     - path: src/features/outliers_removal.py
       hash: md5
       md5: a0e711a6c69ffebf9cf112ba98d9144c
@@ -128,104 +128,104 @@ stages:
     outs:
     - path: data/processed/final
       hash: md5
-      md5: bcd6faf5d20986490c50409b116519c9.dir
-      size: 346627399
+      md5: 51e2a0fca9d5c35bb9784e2c602b905a.dir
+      size: 345128897
       nfiles: 3
     - path: models/transformers
       hash: md5
-      md5: 23579a6b700f8e54367d438dd379de7a.dir
-      size: 6494
+      md5: ac006e8a971514f425e9e0cb209215f8.dir
+      size: 5966
       nfiles: 3
   train_model:
     cmd: python -m src.models.train_model
     deps:
-    - path: data/interim/train.csv
+    - path: data/processed/build-features/train.csv
       hash: md5
-      md5: 9282cea0cb6ddf4bdcca66b54678d900
-      size: 177304798
-    - path: data/processed/final/train.csv
+      md5: fd3df5bb8d535640a6b5f07fff333311
+      size: 214106185
+    - path: params.yaml
       hash: md5
-      md5: 4573a39d69aa07bb808d534133b98e68
-      size: 225880456
-    - path: models/transformers/output_transformer.joblib
-      hash: md5
-      md5: 18506b710ce8460b04e0041b1d610de7
-      size: 805
+      md5: c9261a40ae66d9845e065f6efdd14d16
+      size: 429
     - path: src/features/data_preprocessing.py
       hash: md5
-      md5: f37bedbb517c442e2979781f91312a8d
-      size: 7736
-    - path: src/features/distances.py
-      hash: md5
-      md5: 38057c1bb6aee8127fb0d2081f136659
-      size: 1338
+      md5: 1738b906660c105082827da9d91c9a71
+      size: 9487
     - path: src/features/outliers_removal.py
       hash: md5
       md5: a0e711a6c69ffebf9cf112ba98d9144c
       size: 1138
+    - path: src/logger.py
+      hash: md5
+      md5: 14391c282a41b6884a0659b672c1c3da
+      size: 3898
+    - path: src/models/model_components.py
+      hash: md5
+      md5: 60e335830072ea34ea6f32e0ece8c3ec
+      size: 2395
     - path: src/models/train_model.py
       hash: md5
-      md5: ccf9822fb9c4d76a696942e629b39ca0
-      size: 11024
-    params:
-      params.yaml:
-        data_preprocessing.percentiles:
-        - 0.002
-        - 0.998
-        train_model.cv_folds: 5
-        train_model.n_trials: 20
-        train_model.random_state: 42
+      md5: 7999678031ea0929f6f1950fc7010571
+      size: 24747
     outs:
-    - path: models/models/xgbreg.joblib
+    - path: models/models/stacking_regressor.joblib
       hash: md5
-      md5: 378a3bc09f765957a09e09fc3f3d9f4e
-      size: 23795375
-    - path: reports/metrics/optuna_results.json
+      md5: 15ffcaace8aec6ba186189efeb090bd4
+      size: 12574353
+    - path: reports/metrics/optuna
       hash: md5
-      md5: 8c612ffaa6d9792245f80568fffa736b
-      size: 425
+      md5: 550bb0be4fa4558e8d54b6f2e7fc1eff.dir
+      size: 19968
+      nfiles: 3
+    - path: reports/metrics/stacking_results.json
+      hash: md5
+      md5: 970353a546f1e41ea54c37eddc2071b2
+      size: 2675
   predict_model:
-    cmd: python -m src.models.predict_model train.csv val.csv
+    cmd: python -m src.models.predict_model
     deps:
-    - path: data/processed/final/val.csv
+    - path: data/processed/build-features/val.csv
       hash: md5
-      md5: 4e272387998d5f78b6b415adacc49906
-      size: 25102693
-    - path: models/models/xgbreg.joblib
+      md5: 7c5f78bd281035f2d4c220858b4888ac
+      size: 23795086
+    - path: models/models/stacking_regressor.joblib
       hash: md5
-      md5: 378a3bc09f765957a09e09fc3f3d9f4e
-      size: 23795375
-    - path: models/transformers/output_transformer.joblib
+      md5: 15ffcaace8aec6ba186189efeb090bd4
+      size: 12574353
+    - path: src/logger.py
       hash: md5
-      md5: 18506b710ce8460b04e0041b1d610de7
-      size: 805
-    - path: src/features/data_preprocessing.py
-      hash: md5
-      md5: f37bedbb517c442e2979781f91312a8d
-      size: 7736
+      md5: 14391c282a41b6884a0659b672c1c3da
+      size: 3898
     - path: src/models/predict_model.py
       hash: md5
-      md5: bbce4d02a2e65b374d2fe5435efea53e
-      size: 4968
+      md5: 6b8810d95f454a109cffcaa3189369eb
+      size: 7466
     outs:
-    - path: reports/metrics/validation_metrics.json
+    - path: reports/metrics/stacking_validation_metrics.json
       hash: md5
-      md5: f341fe783262e0834184c3c2d45cf62a
-      size: 225
+      md5: e5a7737e1dad12acb961342c82ef3687
+      size: 486
   plot_results:
     cmd: python -m src.visualization.plot_results
     deps:
-    - path: reports/metrics/validation_metrics.json
+    - path: data/processed/build-features/val.csv
       hash: md5
-      md5: f341fe783262e0834184c3c2d45cf62a
-      size: 225
+      md5: 7c5f78bd281035f2d4c220858b4888ac
+      size: 23795086
+    - path: models/models/stacking_regressor.joblib
+      hash: md5
+      md5: 15ffcaace8aec6ba186189efeb090bd4
+      size: 12574353
+    - path: src/logger.py
+      hash: md5
+      md5: 14391c282a41b6884a0659b672c1c3da
+      size: 3898
     - path: src/visualization/plot_results.py
       hash: md5
-      md5: 74a189cf8a7908579525826c8d76efc6
-      size: 4407
+      md5: 4837e57200cc0b243cb3ac8c4abf83e1
+      size: 10285
     outs:
-    - path: plots/model_results
+    - path: plots/model_results/results.png
       hash: md5
-      md5: b3f7e8ec0017ce52362ccdc0e63a91c5.dir
-      size: 334651
-      nfiles: 1
+      md5: b3d2ca5281d45d998c9a5209516307a5
+      size: 257888

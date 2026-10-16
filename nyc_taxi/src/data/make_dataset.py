@@ -77,7 +77,7 @@ def main():
     # interim data directory path
     interim_data_path = root_path / 'data' / 'interim'
     # make directory for the interim path
-    interim_data_path.mkdir(exist_ok= True)
+    interim_data_path.mkdir(parents=True, exist_ok= True)
     # raw train file path
     raw_df_path = root_path / 'data' / 'raw' / 'extracted' / input_file_name
     # load the training file

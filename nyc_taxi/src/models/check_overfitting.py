@@ -4,83 +4,56 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import (
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
+
+MODEL_PATH = ROOT / "models" / "models" / "stacking_regressor.joblib"
+TRAIN_PATH = ROOT / "data" / "processed" / "build-features" / "train.csv"
+VAL_PATH = ROOT / "data" / "processed" / "build-features" / "val.csv"
+
+TARGET = "trip_duration"
 
 
-def evaluate_model(model, transformer, data_path, dataset_name):
-    # Load the prepared dataset
-    data = pd.read_csv(data_path)
+def evaluate(model, data, dataset_name):
+    X = data.drop(columns=[TARGET])
+    y_actual = pd.to_numeric(data[TARGET]).to_numpy(dtype=float)
 
-    X = data.drop(columns=["trip_duration"])
-    y_transformed = data["trip_duration"].to_numpy().reshape(-1, 1)
+    # The model predicts natural-log trip duration.
+    y_pred = np.exp(
+        np.asarray(model.predict(X), dtype=float).reshape(-1)
+    )
 
-    # Predict in the transformed target space
-    predictions_transformed = model.predict(X).reshape(-1, 1)
+    # If training data has already undergone preprocessing,
+    # ensure this matches the target units used by your pipeline.
+    rmse = np.sqrt(mean_squared_error(y_actual, y_pred))
+    mae = mean_absolute_error(y_actual, y_pred)
+    r2 = r2_score(y_actual, y_pred)
 
-    # Convert actual and predicted durations back to minutes
-    y_actual = transformer.inverse_transform(y_transformed).ravel()
-    y_predicted = transformer.inverse_transform(
-        predictions_transformed
-    ).ravel()
-
-    # Calculate metrics in minutes
-    rmse = np.sqrt(mean_squared_error(y_actual, y_predicted))
-    mae = mean_absolute_error(y_actual, y_predicted)
-    r2 = r2_score(y_actual, y_predicted)
-
-    print(f"\n{dataset_name} Results")
-    print("-" * 40)
-    print(f"Rows: {len(data):,}")
+    print(f"\n{dataset_name} metrics")
     print(f"RMSE: {rmse:.4f} minutes")
     print(f"MAE:  {mae:.4f} minutes")
     print(f"R²:   {r2:.4f}")
 
-    return {"rmse": rmse, "mae": mae, "r2": r2}
+    return rmse, mae, r2
 
 
 def main():
-    root = Path(__file__).resolve().parents[2]
+    model = joblib.load(MODEL_PATH)
+    train_data = pd.read_csv(TRAIN_PATH)
+    val_data = pd.read_csv(VAL_PATH)
 
-    model_path = root / "models" / "models" / "xgbreg.joblib"
-    transformer_path = (
-        root / "models" / "transformers" / "output_transformer.joblib"
-    )
-    train_path = root / "data" / "processed" / "final" / "train.csv"
-    val_path = root / "data" / "processed" / "final" / "val.csv"
+    train_metrics = evaluate(model, train_data, "TRAINING")
+    val_metrics = evaluate(model, val_data, "VALIDATION")
 
-    # Load the existing trained artifacts
-    model = joblib.load(model_path)
-    transformer = joblib.load(transformer_path)
-
-    print("Evaluating the existing XGBoost model")
-    print("No model retraining will be performed.")
-
-    train_metrics = evaluate_model(
-        model, transformer, train_path, "TRAINING"
-    )
-    val_metrics = evaluate_model(
-        model, transformer, val_path, "VALIDATION"
-    )
-
-    print("\nOVERFITTING CHECK")
-    print("-" * 40)
-    print(
-        f"RMSE gap (validation - training): "
-        f"{val_metrics['rmse'] - train_metrics['rmse']:.4f} minutes"
-    )
-    print(
-        f"MAE gap (validation - training): "
-        f"{val_metrics['mae'] - train_metrics['mae']:.4f} minutes"
-    )
-    print(
-        f"R² gap (training - validation): "
-        f"{train_metrics['r2'] - val_metrics['r2']:.4f}"
-    )
-
-    print(
-        "\nCompare the gaps alongside the absolute metrics. "
-        "A larger training-validation gap can indicate overfitting."
-    )
+    print("\nMetric comparison")
+    print(f"RMSE gap: {val_metrics[0] - train_metrics[0]:.4f} minutes")
+    print(f"MAE gap:  {val_metrics[1] - train_metrics[1]:.4f} minutes")
+    print(f"R² gap:   {train_metrics[2] - val_metrics[2]:.4f}")
 
 
 if __name__ == "__main__":

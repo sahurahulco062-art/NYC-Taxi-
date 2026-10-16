@@ -3,10 +3,11 @@ from yaml import safe_load
 import pandas as pd
 from pathlib import Path
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler, PowerTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler, FunctionTransformer
 from src.features.outliers_removal import OutliersRemover
 import joblib
 import sys
+import logging
 
 COLUMN_NAMES = ['pickup_latitude',
                 'pickup_longitude',
@@ -62,11 +63,20 @@ def transform_data(transformer,data:pd.DataFrame):
     return data_transformed
 
 def transform_output(target:pd.Series):
-    power_transform = PowerTransformer(method='yeo-johnson',standardize=True)
-    # fit and transform the target
-    target_transformed = power_transform.fit(target.values.reshape(-1,1))
-    
-    return power_transform
+    target_values = np.asarray(target).reshape(-1, 1)
+    if not np.isfinite(target_values).all():
+        raise ValueError('Target contains non-finite values; cannot apply natural log.')
+    if (target_values <= 0).any():
+        raise ValueError('All trip_duration target values must be > 0 for np.log.')
+
+    log_transformer = FunctionTransformer(
+        func=np.log,
+        inverse_func=np.exp,
+        validate=False,
+        check_inverse=False,
+    )
+    log_transformer.fit(target_values)
+    return log_transformer
 
 def read_dataframe(path):
     df = pd.read_csv(path)
@@ -77,6 +87,14 @@ def save_dataframe(dataframe:pd.DataFrame, save_path):
 
     
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s | %(levelname)s | %(name)s | %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
+    )
+    logger = logging.getLogger(__name__)
+    logger.info('Starting data preprocessing.')
     # current file path
     current_path = Path(__file__)
     # root directory path
@@ -88,22 +106,26 @@ def main():
         params = safe_load(f)
     # percentile values
     percentiles = list(params['data_preprocessing']['percentiles'])
+    logger.info('Loaded preprocessing percentiles: %s', percentiles)
     # save transformers path
     save_transformers_path = root_path / 'models' / 'transformers'
     # make directory
-    save_transformers_path.mkdir(exist_ok=True)
+    save_transformers_path.mkdir(parents=True, exist_ok=True)
     # save output file path
     save_data_path = root_path / 'data' / 'processed' / 'final'
     # make directory
     save_data_path.mkdir(exist_ok=True)
     
     for filename in sys.argv[1:]:
+        logger.info('Processing file: %s', filename)
         complete_input_path = input_path / filename
         if filename == 'train.csv':
             df = read_dataframe(complete_input_path)
+            logger.info('Loaded training data: %d rows, %d columns.', len(df), len(df.columns))
             # make X and y
             X = df.drop(columns=TARGET)
             y = df[TARGET]
+            logger.info('Fitting outlier transformer on training features.')
             # remove outliers from data
             outlier_transformer = remove_outliers(dataframe=X,percentiles=percentiles,
                                                   column_names=COLUMN_NAMES)
@@ -113,6 +135,7 @@ def main():
             # transform the data
             df_without_outliers = transform_data(transformer=outlier_transformer,
                                                  data=X)                
+            logger.info('Fitting feature preprocessor on training features.')
             # train the preprocessor on the data
             preprocessor = train_preprocessor(data=df_without_outliers)
             # save the preprocessor
@@ -121,9 +144,11 @@ def main():
             # transform the data
             X_trans = transform_data(transformer=preprocessor,
                                      data=df_without_outliers)
-            # fit the target transformer
+            # fit the natural-log target transformer on training targets
             y_filtered = y.loc[df_without_outliers.index]
+            logger.info('Fitting natural-log target transformer on %d training targets.', len(y_filtered))
             output_transformer = transform_output(y_filtered)
+            logger.info('Natural-log target transformer fitted.')
             # transform the target
             y_trans = transform_data(transformer=output_transformer,
                                      data=y_filtered.values.reshape(-1,1))
@@ -132,13 +157,16 @@ def main():
             # save the output transformer
             save_transformer(path=save_transformers_path / 'output_transformer.joblib',
                              object=output_transformer)
+            logger.info('Saved target transformer to %s.', save_transformers_path / 'output_transformer.joblib')
             
             # save the transformed data
             save_dataframe(dataframe=X_trans,
                            save_path=save_data_path / filename)
+            logger.info('Saved processed data to %s.', save_data_path / filename)
             
         elif filename == 'val.csv':
             df = read_dataframe(complete_input_path)
+            logger.info('Loaded validation data: %d rows, %d columns.', len(df), len(df.columns))
             # make X and y
             X = df.drop(columns=TARGET)
             y = df[TARGET]
@@ -152,8 +180,9 @@ def main():
             X_trans = transform_data(transformer=preprocessor,
                                     data=df_without_outliers)
             y_filtered = y.loc[df_without_outliers.index]
-            # load the output transformer
+            # load the training-fitted natural-log target transformer
             output_transformer = joblib.load(save_transformers_path / 'output_transformer.joblib') 
+            logger.info('Applying training-fitted natural-log transformer to validation target.')
             # transform the target
             y_trans = transform_data(transformer=output_transformer,
                                     data=y_filtered.values.reshape(-1,1))
@@ -166,6 +195,7 @@ def main():
             
         elif filename == 'test.csv':
             df = read_dataframe(complete_input_path)
+            logger.info('Loaded test data: %d rows, %d columns.', len(df), len(df.columns))
             # load the transfomer
             outlier_transformer = joblib.load(save_transformers_path / 'outliers.joblib')
             df_without_outliers = transform_data(transformer=outlier_transformer,
